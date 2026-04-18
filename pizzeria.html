@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Pizzería Pro - Supabase Cloud</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; display: flex; gap: 20px; }
+        .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .menu { flex: 2; }
+        .pedido { flex: 1; min-width: 300px; border-left: 5px solid #ff9800; }
+        
+        .grid-toppings { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); 
+            gap: 15px; margin-top: 20px;
+        }
+        
+        .card {
+            border: 2px solid #eee; padding: 15px; border-radius: 10px; text-align: center;
+            cursor: pointer; transition: 0.3s;
+        }
+        .card:hover { border-color: #ff9800; background: #fffdfa; transform: translateY(-3px); }
+        .card span { font-size: 2.5rem; display: block; margin-bottom: 5px; }
+
+        .item-pedido { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+ .btn-ordenar {
+    padding: 20px; /* Esto lo hace bien grande y fácil de tocar */
+    font-size: 1.2rem;
+}
+        /* Estilo para el campo de nombre */
+        .input-nombre {
+            width: 100%; padding: 10px; margin-top: 15px; border: 1px solid #ccc; 
+            border-radius: 5px; box-sizing: border-box;
+        }
+/* --- AQUÍ EMPIEZAN LOS RESPONSIVOS --- */
+/* --- RESPONSIVO PARA PIZZERIA.HTML --- */
+/* --- ESTO ARREGLA EL SCROLLING HORIZONTAL --- */
+@media (max-width: 600px) {
+    body {
+        /* 1. Cambiamos la dirección de la fila (horizontal) a columna (vertical) */
+        flex-direction: column !important; 
+        
+        /* 2. Quitamos el padding excesivo que puede empujar el contenido hacia los lados */
+        padding: 10px; 
+        
+        /* 3. Evitamos el desbordamiento horizontal a toda costa */
+        overflow-x: hidden; 
+        
+        /* 4. Importante: eliminamos cualquier ancho fijo del body */
+        width: 100vw; 
+    }
+
+    .panel {
+        /* 5. Los paneles ahora deben ocupar el 100% del ancho del móvil */
+        width: 100% !important; 
+        max-width: 100%;
+        margin-bottom: 20px;
+        box-sizing: border-box; /* Esto evita que el padding 'infle' el panel */
+    }
+
+    .pedido {
+        /* 6. Quitamos la línea naranja de la izquierda y la ponemos arriba */
+        border-left: none;
+        border-top: 5px solid #ff9800;
+        min-width: unset; /* Quitamos el min-width que tenías de 300px */
+    }
+}
+
+    </style>
+</head>
+<body>
+
+    <div class="panel menu">
+        <h2>🍕 Haz tu Pedido de Pizzas (Desde la Nube)</h2>
+        <div id="contenedorMenu" class="grid-toppings">Cargando ingredientes...</div>
+    </div>
+
+    <div class="panel pedido">
+        <h2>🛒 Tu Pedido</h2>
+        <div id="listaPedido"></div>
+        <hr>
+        
+        <input type="text" id="nombreCliente" class="input-nombre" placeholder="¿A nombre de quién?">
+        <input type="text" id="telefonoCliente" class="input-nombre" placeholder="Tu teléfono de contacto...">
+<input type="text" id="direccion" class="input-nombre" 
+       placeholder="Escribe tu dirección exacta..." required>
+
+<button type="button" onclick="obtenerGPS()" 
+        style="background: #3498db; color: white; border: none; padding: 12px; border-radius: 5px; margin-top: 10px; cursor: pointer; width: 100%; font-weight: bold;">
+    📍 O usa mi ubicación exacta (GPS)
+</button>
+
+<h3>Total: $<span id="totalTxt">0.00</span></h3>
+<button class="btn-ordenar" onclick="confirmarPedido()">Enviar Pedido a Cocina</button>
+    </div>
+
+    <script>
+    const SUPABASE_URL = 'https://hjwfmexfahcqsiqnsxpd.supabase.co'; 
+    const SUPABASE_KEY = 'sb_publishable_mH6jx0dJyPpbxIGyvWlP4g_5o8NlOmJ';
+    const clienteSupabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let pedido = [];
+
+    async function obtenerIngredientes() {
+        const { data, error } = await clienteSupabase
+            .from('toppings')
+            .select('*')
+            .order('nombre', { ascending: true });
+
+        if (error) {
+            document.getElementById('contenedorMenu').innerHTML = "Error al conectar con la base de datos.";
+            return;
+        }
+        dibujarMenu(data);
+    }
+
+    function dibujarMenu(ingredientes) {
+        const contenedor = document.getElementById('contenedorMenu');
+        contenedor.innerHTML = ""; 
+        ingredientes.forEach(ing => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+                <span>${ing.icono || '🍕'}</span>
+                <strong>${ing.nombre}</strong><br>
+                $${Number(ing.precio).toFixed(2)}
+            `;
+            div.onclick = () => agregarAlPedido(ing);
+            contenedor.appendChild(div);
+        });
+    }
+
+    function agregarAlPedido(ingrediente) {
+        pedido.push(ingrediente);
+        actualizarInterfaz();
+    }
+
+    function actualizarInterfaz() {
+        const lista = document.getElementById('listaPedido');
+        const totalSpan = document.getElementById('totalTxt');
+        lista.innerHTML = "";
+        let total = 0;
+        pedido.forEach((item, index) => {
+            total += Number(item.precio);
+            lista.innerHTML += `
+                <div class="item-pedido">
+                    <span>${item.icono || '🍕'} ${item.nombre}</span>
+                    <span>$${Number(item.precio).toFixed(2)} <button onclick="quitar(${index})">❌</button></span>
+                </div>`;
+        });
+        totalSpan.innerText = total.toFixed(2);
+    }
+
+    function quitar(index) {
+        pedido.splice(index, 1);
+        actualizarInterfaz();
+    }
+
+async function confirmarPedido() {
+    const nombreInput = document.getElementById('nombreCliente');
+    const telefonoInput = document.getElementById('telefonoCliente');
+    const direccionInput = document.getElementById('direccion'); // <--- Referencia al input
+
+    const nombre = nombreInput.value.trim();
+    const telefono = telefonoInput.value.trim(); 
+    const direccion = direccionInput.value.trim(); // <--- Ahora con paréntesis ()
+
+    // Validaciones
+    if (!nombre || !telefono || !direccion) 
+        return alert("Por favor, llena todos los campos (Nombre, Teléfono y Dirección).");
+    if (pedido.length === 0) return alert("Selecciona al menos un ingrediente.");
+
+    const listaNombres = pedido.map(ing => ing.nombre).join(", ");
+    const precioTotal = pedido.reduce((sum, ing) => sum + Number(ing.precio), 0);
+
+    try {
+        const { error } = await clienteSupabase
+            .from('pedidos')
+            .insert([{ 
+                nombre: nombre, 
+                telefono: telefono, 
+                contenido: listaNombres, 
+                total: precioTotal, // <--- ¡AQUÍ FALTABA LA COMA!
+                direccion: direccion 
+            }]);
+
+        if (error) throw error;
+
+        alert("¡Pedido enviado con éxito! 🍕");
+        
+        // Limpieza de campos
+        pedido = [];
+        nombreInput.value = ""; 
+        telefonoInput.value = "";
+        direccionInput.value = ""; // Limpiamos dirección también
+        actualizarInterfaz();
+
+    } catch (error) {
+        console.error(error);
+        alert("Error al enviar: " + error.message);
+    }
+}
+
+    obtenerIngredientes();
+function obtenerGPS() {
+    if (navigator.geolocation) {
+        const direccionInput = document.getElementById('direccion');
+        direccionInput.value = "Buscando satélites... 🛰️";
+
+        // Estas son las opciones que fuerzan la precisión real
+        const opcionesGps = {
+            enableHighAccuracy: true, // ¡ESTO ES CLAVE! Obliga al chip GPS real
+            timeout: 15000,           // Espera hasta 15 segundos al satélite
+            maximumAge: 0             // No acepta ubicaciones viejas de la memoria
+        };
+
+        navigator.geolocation.getCurrentPosition(
+            function(posicion) {
+                const lat = posicion.coords.latitude;
+                const lon = posicion.coords.longitude;
+                const precision = posicion.coords.accuracy;
+
+                // Si la precisión es mayor a 5000 metros, es probable que sea la IP fallando
+                if (precision > 5000) {
+                    alert("⚠️ Aviso: La señal es débil. Se está usando internet en lugar de satélite.");
+                }
+
+                // Generamos el link dinámico con tus coordenadas reales
+                direccionInput.value = `https://www.google.com/maps?q=${lat},${lon}`;
+                
+                alert(`🎯 ¡Ubicación REAL capturada! Precisión: ${Math.round(precision)} metros.`);
+            }, 
+            function(error) {
+                direccionInput.value = "";
+                let mensaje = "Error al obtener ubicación.";
+                if (error.code === 1) mensaje = "Debes permitir el acceso al GPS en tu navegador.";
+                if (error.code === 3) mensaje = "El satélite tardó mucho. Intenta de nuevo en un lugar abierto.";
+                alert(mensaje);
+            }, 
+            opcionesGps // Aquí es donde aplicamos el blindaje
+        );
+    } else {
+        alert("Tu navegador no soporta GPS.");
+    }
+}
+    </script>
+</body>
+</html>
