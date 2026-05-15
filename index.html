@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Pizzería Pro</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; display: flex; gap: 20px; }
@@ -49,7 +50,7 @@
         
         <input type="text" id="nombreCliente" class="input-nombre" placeholder="¿A nombre de quién?">
         <input type="text" id="telefonoCliente" class="input-nombre" placeholder="Teléfono (0412, 0424, 0414...)">
-        <input type="text" id="direccion" class="input-nombre" placeholder="Dirección exacta..." required>
+        <input type="text" id="direccion" class="input-nombre" placeholder="Calle, casa, punto de referencia..." required>
 
         <button type="button" onclick="obtenerGPS()" style="background: #3498db; color: white; border: none; padding: 12px; border-radius: 5px; margin-top: 10px; cursor: pointer; width: 100%; font-weight: bold;">
             📍 O usa mi ubicación exacta (GPS)
@@ -249,6 +250,32 @@ const contenido = pedido.map(p => {
         console.error("Error detectado completo:", error);
         alert("Error: " + error.message);
     }
+}
+async function cargarToppings() {
+    // 1. Traemos los datos de la tabla que vemos en image_ecc3d9.png
+    const { data, error } = await supabaseClient
+        .from('toppings')
+        .select('id, nombre, precio, icono'); // Asegúrate de pedir estas columnas
+
+    if (error) {
+        console.error("Error cargando toppings:", error);
+        return;
+    }
+
+    const contenedor = document.getElementById('contenedor-toppings');
+    contenedor.innerHTML = '';
+
+    data.forEach(topping => {
+        // 2. Usamos 'topping.nombre' y 'topping.icono' que son los nombres de tus columnas
+        contenedor.innerHTML += `
+            <div class="topping-item">
+                <input type="checkbox" id="top-${topping.id}" value="${topping.nombre}" data-precio="${topping.precio}">
+                <label for="top-${topping.id}">
+                    ${topping.icono} ${topping.nombre} (+$${topping.precio})
+                </label>
+            </div>
+        `;
+    });
 }
 
     function obtenerGPS() {

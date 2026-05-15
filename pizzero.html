@@ -136,7 +136,7 @@ function mostrarPedidos(pedidos) {
                 </div>
 
                 <div class="card-footer" style="padding: 10px; background: #f9f9f9; border-radius: 0 0 12px 12px;">
-                    <button onclick="finalizarPedido(${pedido.id})" style="width: 100%; background: #28a745; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase;">
+                    <button onclick="despacharPedido(${pedido.id})" style="width: 100%; background: #28a745; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase;">
                         Despachar Pedido <i class="fas fa-check"></i>
                     </button>
                 </div>
@@ -144,10 +144,20 @@ function mostrarPedidos(pedidos) {
     });
 }
 
-    async function finalizarPedido(id) {
-        const { error } = await supabaseClient.from('pedidos').update({ estado: 'entregado' }).eq('id', id);
-        if (!error) cargarDatos();
+// FUNCIÓN CORREGIDA: Ahora pone el estado como 'despachado'
+async function despacharPedido(id) {
+    const { error } = await supabaseClient
+        .from('pedidos')
+        .update({ estado: 'despachado' }) // 'despachado' es lo que espera el motorizado
+        .eq('id', id);
+
+    if (error) {
+        alert("Error al despachar: " + error.message);
+    } else {
+        alert("¡Pedido enviado al motorizado! 🛵");
+        cargarDatos(); // Recarga la lista para quitar el que acabas de despachar
     }
+}
 
     async function logout() {
         await supabaseClient.auth.signOut();
