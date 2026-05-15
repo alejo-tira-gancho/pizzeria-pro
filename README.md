@@ -1,1 +1,1 @@
-# pizzeria-pro
+Aplicación para una tienda de comida.
