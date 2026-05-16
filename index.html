@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Last-Modified" content="0">
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">    
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; display: flex; gap: 20px; }
         .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -252,30 +256,38 @@ const contenido = pedido.map(p => {
     }
 }
 async function cargarToppings() {
-    // 1. Traemos los datos de la tabla que vemos en image_ecc3d9.png
+    localStorage.clear();
+    console.log("Memoria limpia, pidiendo datos frescos...");
+    // 1. Petición mejorada (reemplaza a la anterior)
     const { data, error } = await supabaseClient
         .from('toppings')
-        .select('id, nombre, precio, icono'); // Asegúrate de pedir estas columnas
+        .select('id, nombre, precio, icono', { count: 'exact', head: false }) 
+        .abortSignal(AbortSignal.timeout(5000)); // Si en 5 seg no responde, cancela
 
+    // 2. Manejo de errores
     if (error) {
         console.error("Error cargando toppings:", error);
+        // Si hay error, podrías mostrar un mensaje en el contenedor
+        document.getElementById('contenedor-toppings').innerHTML = '<p>Error al cargar ingredientes...</p>';
         return;
     }
 
+    // 3. Limpieza y dibujado
     const contenedor = document.getElementById('contenedor-toppings');
     contenedor.innerHTML = '';
 
-    data.forEach(topping => {
-        // 2. Usamos 'topping.nombre' y 'topping.icono' que son los nombres de tus columnas
-        contenedor.innerHTML += `
-            <div class="topping-item">
-                <input type="checkbox" id="top-${topping.id}" value="${topping.nombre}" data-precio="${topping.precio}">
-                <label for="top-${topping.id}">
-                    ${topping.icono} ${topping.nombre} (+$${topping.precio})
-                </label>
-            </div>
-        `;
-    });
+    if (data) {
+        data.forEach(topping => {
+            contenedor.innerHTML += `
+                <div class="topping-item">
+                    <input type="checkbox" id="top-${topping.id}" value="${topping.nombre}" data-precio="${topping.precio}" onchange="calcularTotal()">
+                    <label for="top-${topping.id}" style="cursor:pointer;">
+                        ${topping.icono} <strong>${topping.nombre}</strong> (+$${topping.precio})
+                    </label>
+                </div>
+            `;
+        });
+    }
 }
 
     function obtenerGPS() {
